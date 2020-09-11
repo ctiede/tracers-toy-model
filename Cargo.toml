@@ -10,5 +10,6 @@ edition = "2018"
 num     = "0.3"
 ndarray = "0.13"
 hdf5    = "0.7"
+rand    = "0.7.3"
 
 ndarray-ops = { path = "ndarray-ops" }
