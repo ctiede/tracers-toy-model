@@ -11,10 +11,10 @@ static TAU: f64 = 2.0 * std::f64::consts::PI;
 // ============================================================================
 pub struct Grid
 {
-    pub cell_centers   : Array<(f64, f64), Ix2>,
-    pub face_centers_x : Array<(f64, f64), Ix2>,
-    pub face_centers_y : Array<(f64, f64), Ix2>,
-    pub tracer_list    : Vec<tracers::Tracer>,
+    pub cell_centers    : Array<(f64, f64), Ix2>,
+    pub face_centers_x  : Array<(f64, f64), Ix2>,
+    pub face_centers_y  : Array<(f64, f64), Ix2>,
+    pub velocity_fields : Velocities,
 }
 
 pub struct Velocities
@@ -65,8 +65,16 @@ pub fn face_centers_y(domain_radius: f64, block_size: usize) -> Array<(f64, f64)
 
 pub fn init_tracer_list(domain_radius: f64, ntracers: usize) -> Vec<tracers::Tracer>
 {
-    let tracers: Vec<_> = (0..ntracers).map(|_| tracers::Tracer::randomize(domain_radius)).collect();
-    return tracers;
+    return (0..ntracers).map(|_| tracers::Tracer::randomize(domain_radius)).collect();
+}
+
+
+
+
+// ============================================================================
+fn update(tracers: Vec<tracers::Tracer>, grid: Grid, dt: f64) -> Vec<tracers::Tracer>
+{
+    return tracers.map(|t| t.update(grid, dt));
 }
 
 
@@ -79,10 +87,15 @@ fn run(domain_radius: f64, block_size: usize, ntracers: usize) -> ()
         cell_centers  : cell_centers  (domain_radius, block_size),
         face_centers_x: face_centers_x(domain_radius, block_size),
         face_centers_y: face_centers_y(domain_radius, block_size),
-        tracer_list   : init_tracer_list(domain_radius, ntracers),
+        vfields       : Velocities::initialize_sine(grid),
     };
 
-    let _vfield = Velocities::initialize_sine(grid);
+    let tracers = init_tracer_list(domain_radius, ntracers);
+
+    let dt = 0.01;
+    let tf = 1.0;
+
+    new_tracers = update(tracers, Grid, dt);
 }
 
 
