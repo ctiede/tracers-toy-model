@@ -59,7 +59,7 @@ fn get_cell_index(x: f64, grid: Grid, dir: Direction) -> usize
 
 fn search_for_index(target: f64, array: Array<f64>) -> usize
 {
-    //do binary search for target in array and return the index
+    // non-functional binary search for the index of the array element left-adjacent to target
     let mut size = array.len();
     if size == 0 
     {
