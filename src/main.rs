@@ -11,10 +11,11 @@ static TAU: f64 = 2.0 * std::f64::consts::PI;
 // ============================================================================
 pub struct Grid
 {
+    domain_radius       : f64,
+    block_size          : usize,
     pub cell_centers    : Array<(f64, f64), Ix2>,
     pub face_centers_x  : Array<(f64, f64), Ix2>,
     pub face_centers_y  : Array<(f64, f64), Ix2>,
-    pub velocity_fields : Velocities,
 }
 
 pub struct Velocities
@@ -25,7 +26,7 @@ pub struct Velocities
 
 impl Velocities
 {
-    fn initialize_sine(grid: Grid) -> Velocities
+    pub fn initialize_sine(grid: &Grid) -> Velocities
     {
         return Velocities{
             face_vx: grid.face_centers_x.mapv(|xy: (f64, f64)| -> f64 {let (x, _) = xy; x.sin()}),
@@ -72,9 +73,9 @@ pub fn init_tracer_list(domain_radius: f64, ntracers: usize) -> Vec<tracers::Tra
 
 
 // ============================================================================
-fn update(tracers: Vec<tracers::Tracer>, grid: Grid, dt: f64) -> Vec<tracers::Tracer>
+fn update(tracers: Vec<tracers::Tracer>, grid: &Grid, vfields: &Velocities, dt: f64) -> Vec<tracers::Tracer>
 {
-    return tracers.map(|t| t.update(grid, dt));
+    return tracers.into_iter().map(|t| t.update(grid, vfields, dt)).collect();
 }
 
 
@@ -84,18 +85,26 @@ fn update(tracers: Vec<tracers::Tracer>, grid: Grid, dt: f64) -> Vec<tracers::Tr
 fn run(domain_radius: f64, block_size: usize, ntracers: usize) -> () 
 {
     let grid = Grid{
+        domain_radius : domain_radius,
+        block_size    : block_size,
         cell_centers  : cell_centers  (domain_radius, block_size),
         face_centers_x: face_centers_x(domain_radius, block_size),
         face_centers_y: face_centers_y(domain_radius, block_size),
-        vfields       : Velocities::initialize_sine(grid),
     };
 
-    let tracers = init_tracer_list(domain_radius, ntracers);
+    let vfields = Velocities::initialize_sine(&grid);
+    let mut tracers = init_tracer_list(domain_radius, ntracers);
 
-    let dt = 0.01;
     let tf = 1.0;
+    let dt = 0.01;
 
-    new_tracers = update(tracers, Grid, dt);
+    let mut t = 0.0;
+    while t < tf
+    {
+        println!("t: {:.2}", t);
+        tracers = update(tracers, &grid, &vfields, dt);
+        t += dt;
+    }
 }
 
 
@@ -104,7 +113,7 @@ fn run(domain_radius: f64, block_size: usize, ntracers: usize) -> ()
 // ============================================================================
 fn main() 
 {
-    println!("Hello, world!");
+    println!("Tracers Toy Model!");
 
     let domain_radius      = TAU;
     let block_size: usize  = 64;
