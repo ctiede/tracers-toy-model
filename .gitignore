@@ -1,3 +1,5 @@
 /target
+/Test
 
 test.py
+chkpt.*.h5
