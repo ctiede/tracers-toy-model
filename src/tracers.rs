@@ -1,9 +1,12 @@
 use rand::Rng;
+// use hdf5::Group;
 
 
 
 
 // ============================================================================
+#[repr(C)]
+#[derive(hdf5::H5Type)]
 pub struct Tracer
 {
     pub x : f64,
