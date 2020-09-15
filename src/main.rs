@@ -1,4 +1,3 @@
-
 use ndarray::{Array, Axis, Ix2};
 use ndarray_ops::*;
 use hdf5::File;
@@ -12,14 +11,55 @@ static TAU: f64 = 2.0 * std::f64::consts::PI;
 // ============================================================================
 pub struct Grid
 {
-    domain_radius       : f64,
-    block_size          : usize,
-    pub cell_centers    : Array<(f64, f64), Ix2>,
-    pub face_centers_x  : Array<(f64, f64), Ix2>,
-    pub face_centers_y  : Array<(f64, f64), Ix2>,
+    nx: usize,
+    ny: usize,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+}
+
+impl Grid
+{
+    pub fn cell_centers(&self) -> Array<(f64, f64), Ix2>
+    {
+        let xv = Array::linspace(self.x0, self.x1, self.nx + 1);
+        let yv = Array::linspace(self.y0, self.y1, self.ny + 1);
+        let xc = adjacent_mean(&xv, Axis(0));
+        let yc = adjacent_mean(&yv, Axis(0));
+        return cartesian_product2(xc, yc);
+    }
+
+    pub fn face_centers_x(&self) -> Array<(f64, f64), Ix2>
+    {
+        let xv = Array::linspace(self.x0, self.x1, self.nx + 1);
+        let yv = Array::linspace(self.y0, self.y1, self.ny + 1);
+        let yc = adjacent_mean(&yv, Axis(0));
+        return cartesian_product2(xv, yc);
+    }
+
+    pub fn face_centers_y(&self) -> Array<(f64, f64), Ix2>
+    {
+        let xv = Array::linspace(self.x0, self.x1, self.nx + 1);
+        let yv = Array::linspace(self.y0, self.y1, self.ny + 1);
+        let xc = adjacent_mean(&xv, Axis(0));
+        return cartesian_product2(xc, yv);
+    }
+
+    pub fn get_cell_index(&self, x: f64, y: f64) -> (usize, usize)
+    {
+        let float_i = (x - self.x0) / (self.x1 - self.x0);
+        let float_j = (y - self.y0) / (self.y1 - self.y0);
+        let i = (float_i * (self.nx as f64)) as usize;
+        let j = (float_j * (self.ny as f64)) as usize;
+        return (i, j);
+    }
 }
 
 
+
+
+// ============================================================================
 pub struct Velocities
 {
     pub face_vx: Array<f64, Ix2>, 
@@ -32,19 +72,21 @@ impl Velocities
     pub fn initialize_sine(grid: &Grid) -> Velocities
     {
         return Velocities{
-            face_vx: grid.face_centers_x.mapv(|xy: (f64, f64)| -> f64 {let (x, _) = xy; x.sin()}),
-            face_vy: grid.face_centers_y.mapv(|xy: (f64, f64)| -> f64 {let (_, y) = xy; y.sin()}),            
+            face_vx: grid.face_centers_x().mapv(|xy: (f64, f64)| -> f64 {let (x, _) = xy; x.sin()}),
+            face_vy: grid.face_centers_y().mapv(|xy: (f64, f64)| -> f64 {let (_, y) = xy; y.sin()}),            
         };
     }
 }
 
 
+
+
+// ============================================================================
 pub struct Tasks
 {
     pub tracer_output_interval : usize,
     pub tracer_output_count    : usize,
 }
-
 
 impl Tasks
 {
@@ -63,37 +105,12 @@ impl Tasks
 
 
 // ============================================================================
-fn cell_centers(domain_radius: f64, block_size: usize) -> Array<(f64, f64), Ix2>
-{
-    let xv = Array::linspace(-domain_radius, domain_radius, block_size + 1);
-    let yv = Array::linspace(-domain_radius, domain_radius, block_size + 1);
-    let xc = adjacent_mean(&xv, Axis(0));
-    let yc = adjacent_mean(&yv, Axis(0));
-    return cartesian_product2(xc, yc);
-}
-
-fn face_centers_x(domain_radius: f64, block_size: usize) -> Array<(f64, f64), Ix2>
-{
-    let xv = Array::linspace(-domain_radius, domain_radius, block_size + 1);
-    let yv = Array::linspace(-domain_radius, domain_radius, block_size + 1);
-    let yc = adjacent_mean(&yv, Axis(0));
-    return cartesian_product2(xv, yc);
-}
-
-fn face_centers_y(domain_radius: f64, block_size: usize) -> Array<(f64, f64), Ix2>
-{
-    let xv = Array::linspace(-domain_radius, domain_radius, block_size + 1);
-    let yv = Array::linspace(-domain_radius, domain_radius, block_size + 1);
-    let xc = adjacent_mean(&xv, Axis(0));
-    return cartesian_product2(xc, yv);
-}
-
-fn init_tracer_list(domain_radius: f64, ntracers: usize) -> Vec<tracers::Tracer>
+fn initial_tracer_list(domain_radius: f64, ntracers: usize) -> Vec<tracers::Tracer>
 {
     return (0..ntracers).map(|_| tracers::Tracer::randomize(domain_radius)).collect();
 }
 
-fn create_tasks() -> Tasks
+fn initial_tasks() -> Tasks
 {
     return Tasks{tracer_output_interval: 10, tracer_output_count: 0};
 }
@@ -102,9 +119,11 @@ fn create_tasks() -> Tasks
 
 
 // ============================================================================
-fn update(tracers: &Vec<tracers::Tracer>, grid: &Grid, vfields: &Velocities, dt: f64) -> Vec<tracers::Tracer>
+fn update(tracers: &Vec<tracers::Tracer>, grid: &Grid, vfields: &Velocities, domain_radius: f64, dt: f64) -> Vec<tracers::Tracer>
 {
-    return tracers.into_iter().map(|t| t.update(grid, vfields, dt)).collect();
+    return tracers.into_iter()
+        .map(|t| tracers::apply_boundary_condition(t, domain_radius))
+        .map(|t| t.update(grid, vfields, dt)).collect();
 }
 
 
@@ -115,7 +134,7 @@ fn write_tracers_to_h5(fname: &str, tracers: &Vec<tracers::Tracer>, t: &f64) -> 
 {
     let file = File::create(fname)?;
     file.new_dataset::<f64>().create("t", ())?.write_scalar(t)?;
-    file.new_dataset::<[tracers::Tracer; 1]>().create("tracers", tracers.len())?.write(&tracers)?;
+    file.new_dataset::<tracers::Tracer>().create("tracers", tracers.len())?.write(&tracers)?;
     Ok(())
 }
 
@@ -126,25 +145,25 @@ fn write_tracers_to_h5(fname: &str, tracers: &Vec<tracers::Tracer>, t: &f64) -> 
 fn run(domain_radius: f64, block_size: usize, ntracers: usize) -> Result<(), hdf5::Error> 
 {
     let grid = Grid{
-        domain_radius : domain_radius,
-        block_size    : block_size,
-        cell_centers  : cell_centers  (domain_radius, block_size),
-        face_centers_x: face_centers_x(domain_radius, block_size),
-        face_centers_y: face_centers_y(domain_radius, block_size),
+        nx:  block_size,
+        ny:  block_size,
+        x0: -domain_radius,
+        x1:  domain_radius,
+        y0: -domain_radius,
+        y1:  domain_radius,
     };
 
-    let mut tasks       = create_tasks();
-    let     vfields     = Velocities::initialize_sine(&grid);
-    let     mut tracers = init_tracer_list(domain_radius, ntracers);
-
-    let tf = 1.0;
-    let dt = 0.01;
-
+    let tf          = 1.0;
+    let dt          = 0.01;
+    let vfields     = Velocities::initialize_sine(&grid);
+    let mut tracers = initial_tracer_list(domain_radius, ntracers);
+    let mut tasks   = initial_tasks();
     let mut t = 0.0;
+
     while t < tf
     {
         println!("t: {:.2}", t);
-        tracers = update(&tracers, &grid, &vfields, dt);
+        tracers = update(&tracers, &grid, &vfields, dt, domain_radius);
         tasks.write_tracers(&tracers, &t)?;
         t += dt;
     }
@@ -162,5 +181,6 @@ fn main()
     let domain_radius      = TAU;
     let block_size: usize  = 64;
     let num_tracers: usize = 100;
+
     run(domain_radius, block_size, num_tracers).unwrap_or_else(|e| println!("{}", e));
 }
