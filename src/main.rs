@@ -46,12 +46,39 @@ impl Grid
         return cartesian_product2(xc, yv);
     }
 
+    pub fn face_center(&self, i: usize, j: usize, dir: char) -> (f64, f64)
+    {
+        let dx = (self.x1 - self.x0) / (self.nx + 1) as f64;
+        let dy = (self.y1 - self.y0) / (self.ny + 1) as f64;
+        if dir == 'x'
+        {
+            return ((i as f64) * dx, (j as f64 + 0.5) * dy);
+        }
+        if dir == 'y'
+        {
+            return ((i as f64 + 0.5) * dx, (j as f64) * dy);
+        }
+        // Should handle this case so it doesn't continue
+        println!("Grid::face_center : bad direction!");
+        return (0.0, 0.0);
+    }
+
     pub fn get_cell_index(&self, x: f64, y: f64) -> (usize, usize)
     {
         let float_i = (x - self.x0) / (self.x1 - self.x0);
         let float_j = (y - self.y0) / (self.y1 - self.y0);
+
         let i = (float_i * (self.nx as f64)) as usize;
         let j = (float_j * (self.ny as f64)) as usize;
+        
+        if x > self.x1
+        {
+            println!("Beyond x-boudnary!: {}", i);
+        }
+        if y > self.y1
+        {
+            println!("Beyond y-boudnary!: {}", j);
+        }
         return (i, j);
     }
 }
@@ -66,17 +93,25 @@ pub struct Velocities
     pub face_vy: Array<f64, Ix2>,
 }
 
-
 impl Velocities
 {
     pub fn initialize_sine(grid: &Grid) -> Velocities
     {
         return Velocities{
-            face_vx: grid.face_centers_x().mapv(|xy: (f64, f64)| -> f64 {let (x, _) = xy; x.sin()}),
-            face_vy: grid.face_centers_y().mapv(|xy: (f64, f64)| -> f64 {let (_, y) = xy; y.sin()}),            
+            face_vx: grid.face_centers_x().mapv(|xy: (f64, f64)| -> f64 {let (x, _) = xy;  x.sin()}),
+            face_vy: grid.face_centers_y().mapv(|xy: (f64, f64)| -> f64 {let (_, y) = xy; -y.sin()}),            
         };
     }
+
+    pub fn initialize_div_free(grid: &Grid) -> Velocities
+    {
+        return Velocities{
+            face_vx: grid.face_centers_x().mapv(|xy: (f64, f64)| -> f64 {let (_, y) = xy; y.sin()}),
+            face_vy: grid.face_centers_y().mapv(|xy: (f64, f64)| -> f64 {let (x, _) = xy; x.cos()}),
+        }
+    }
 }
+
 
 
 
@@ -122,8 +157,9 @@ fn initial_tasks() -> Tasks
 fn update(tracers: &Vec<tracers::Tracer>, grid: &Grid, vfields: &Velocities, domain_radius: f64, dt: f64) -> Vec<tracers::Tracer>
 {
     return tracers.into_iter()
-        .map(|t| tracers::apply_boundary_condition(t, domain_radius))
-        .map(|t| t.update(grid, vfields, dt)).collect();
+        .map(|t| tracers::apply_boundary_condition(&t, domain_radius))
+        .map(|t| t.update(grid, vfields, dt))
+        .collect();
 }
 
 
@@ -153,9 +189,9 @@ fn run(domain_radius: f64, block_size: usize, ntracers: usize) -> Result<(), hdf
         y1:  domain_radius,
     };
 
-    let tf          = 1.0;
+    let tf          = 5.0;
     let dt          = 0.01;
-    let vfields     = Velocities::initialize_sine(&grid);
+    let vfields     = Velocities::initialize_div_free(&grid);
     let mut tracers = initial_tracer_list(domain_radius, ntracers);
     let mut tasks   = initial_tasks();
     let mut t = 0.0;
@@ -163,7 +199,7 @@ fn run(domain_radius: f64, block_size: usize, ntracers: usize) -> Result<(), hdf
     while t < tf
     {
         println!("t: {:.2}", t);
-        tracers = update(&tracers, &grid, &vfields, dt, domain_radius);
+        tracers = update(&tracers, &grid, &vfields, domain_radius, dt);
         tasks.write_tracers(&tracers, &t)?;
         t += dt;
     }
@@ -180,7 +216,7 @@ fn main()
 
     let domain_radius      = TAU;
     let block_size: usize  = 64;
-    let num_tracers: usize = 100;
+    let num_tracers: usize = 2000;
 
     run(domain_radius, block_size, num_tracers).unwrap_or_else(|e| println!("{}", e));
 }
