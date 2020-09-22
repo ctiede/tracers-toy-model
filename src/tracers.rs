@@ -1,4 +1,5 @@
 use rand::Rng;
+use crate::Direction;
 
 
 
@@ -37,8 +38,8 @@ impl Tracer
         let (ix, iy) = grid.get_cell_index(self.x, self.y);
         let dx = (grid.x1 - grid.x0) / grid.nx as f64;
         let dy = (grid.y1 - grid.y0) / grid.ny as f64;
-        let wx = (self.x - grid.face_center(ix + 1, iy, 'x').0) / dx; 
-        let wy = (self.y - grid.face_center(ix, iy + 1, 'y').1) / dy; 
+        let wx = (self.x - grid.face_center(ix + 1, iy, Direction::X).0) / dx; 
+        let wy = (self.y - grid.face_center(ix, iy + 1, Direction::Y).1) / dy; 
         let vx = (1.0 - wx) * vfields.face_vx[[ix, iy]] + wx * vfields.face_vx[[ix + 1, iy]];
         let vy = (1.0 - wy) * vfields.face_vy[[ix, iy]] + wy * vfields.face_vy[[ix, iy + 1]];
         return Tracer{x : self.x + vx * dt,
