@@ -110,6 +110,15 @@ impl Velocities
             face_vy: grid.face_centers_y().mapv(|xy: (f64, f64)| -> f64 {let (x, _) = xy; x.cos()}),
         }
     }
+
+    pub fn initialize_rot_flow(grid: &Grid) -> Velocities
+    {
+        let omega = 1.0;
+        return Velocities{
+            face_vx: grid.face_centers_x().mapv(|xy: (f64, f64)| -> f64 {let (_, y) = xy; -omega * y}),
+            face_vy: grid.face_centers_y().mapv(|xy: (f64, f64)| -> f64 {let (x, _) = xy;  omega * x}),
+        }
+    }
 }
 
 
@@ -142,7 +151,7 @@ impl Tasks
 // ============================================================================
 fn initial_tracer_list(domain_radius: f64, ntracers: usize) -> Vec<tracers::Tracer>
 {
-    return (0..ntracers).map(|_| tracers::Tracer::randomize(domain_radius)).collect();
+    return (0..ntracers).map(|i| tracers::Tracer::randomize(domain_radius, i)).collect();
 }
 
 fn initial_tasks() -> Tasks
@@ -189,9 +198,9 @@ fn run(domain_radius: f64, block_size: usize, ntracers: usize) -> Result<(), hdf
         y1:  domain_radius,
     };
 
-    let tf          = 5.0;
+    let tf          = 10.0;
     let dt          = 0.01;
-    let vfields     = Velocities::initialize_div_free(&grid);
+    let vfields     = Velocities::initialize_rot_flow(&grid);
     let mut tracers = initial_tracer_list(domain_radius, ntracers);
     let mut tasks   = initial_tasks();
     let mut t = 0.0;
@@ -216,7 +225,7 @@ fn main()
 
     let domain_radius      = TAU;
     let block_size: usize  = 64;
-    let num_tracers: usize = 2000;
+    let num_tracers: usize = 100;
 
     run(domain_radius, block_size, num_tracers).unwrap_or_else(|e| println!("{}", e));
 }

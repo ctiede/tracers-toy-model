@@ -24,12 +24,12 @@ impl Tracer
         return Tracer{x: 0.0, y: 0.0, id: 0};
     }
 
-    pub fn randomize(domain_radius: f64) -> Tracer
+    pub fn randomize(domain_radius: f64, id: usize) -> Tracer
     {
         let mut rng = rand::thread_rng();
         let rand_x = rng.gen_range(-domain_radius, domain_radius);
         let rand_y = rng.gen_range(-domain_radius, domain_radius);
-        return Tracer{x: rand_x, y: rand_y, id: rng.gen::<usize>()};
+        return Tracer{x: rand_x, y: rand_y, id: id};
     }
 
     pub fn update(&self, grid: &crate::Grid, vfields: &crate::Velocities, dt: f64) -> Tracer
@@ -41,8 +41,8 @@ impl Tracer
         let wy = (self.y - grid.face_center(ix, iy + 1, 'y').1) / dy; 
         let vx = (1.0 - wx) * vfields.face_vx[[ix, iy]] + wx * vfields.face_vx[[ix + 1, iy]];
         let vy = (1.0 - wy) * vfields.face_vy[[ix, iy]] + wy * vfields.face_vy[[ix, iy + 1]];
-        return Tracer{x: self.x + vx * dt,
-                      y: self.y + vy * dt,
+        return Tracer{x : self.x + vx * dt,
+                      y : self.y + vy * dt,
                       id: self.id};
     }
 }
