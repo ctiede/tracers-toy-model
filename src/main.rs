@@ -9,6 +9,15 @@ static TAU: f64 = 2.0 * std::f64::consts::PI;
 
 
 // ============================================================================
+pub enum Direction
+{
+    X, Y,
+}
+
+
+
+
+// ============================================================================
 pub struct Grid
 {
     nx: usize,
@@ -46,21 +55,15 @@ impl Grid
         return cartesian_product2(xc, yv);
     }
 
-    pub fn face_center(&self, i: usize, j: usize, dir: char) -> (f64, f64)
+    pub fn face_center(&self, i: usize, j: usize, direction: Direction) -> (f64, f64)
     {
         let dx = (self.x1 - self.x0) / (self.nx + 1) as f64;
         let dy = (self.y1 - self.y0) / (self.ny + 1) as f64;
-        if dir == 'x'
-        {
-            return ((i as f64) * dx, (j as f64 + 0.5) * dy);
+
+        match direction {
+            Direction::X => ((i as f64) * dx, (j as f64 + 0.5) * dy),
+            Direction::Y => ((i as f64 + 0.5) * dx, (j as f64) * dy),
         }
-        if dir == 'y'
-        {
-            return ((i as f64 + 0.5) * dx, (j as f64) * dy);
-        }
-        // Should handle this case so it doesn't continue
-        println!("Grid::face_center : bad direction!");
-        return (0.0, 0.0);
     }
 
     pub fn get_cell_index(&self, x: f64, y: f64) -> (usize, usize)
