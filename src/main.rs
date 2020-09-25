@@ -163,6 +163,16 @@ fn initial_tasks() -> Tasks
 
 
 // ============================================================================
+fn timed<Input, Task>(input: &Input, task: Task) -> (Input, u64)
+where Task: FnOnce(&Input) -> Input
+{
+    use std::time::Instant;
+    let now = Instant::now();
+    let result = task(input);
+    return (result, now.elapsed().as_secs());
+}
+
+
 fn update(tracers: &Vec<tracers::Tracer>, grid: &Grid, vfields: &Velocities, domain_radius: f64, dt: f64) -> Vec<tracers::Tracer>
 {
     return tracers.into_iter()
@@ -199,16 +209,19 @@ fn run(domain_radius: f64, block_size: usize, ntracers: usize) -> Result<(), hdf
     };
 
     let tf          = 10.0;
-    let dt          = 0.01;
+    let dt          = 0.005;
     let vfields     = Velocities::initialize_rot_flow(&grid);
-    let mut tracers = initial_tracer_list(domain_radius, ntracers);
+    let tracers     = initial_tracer_list(domain_radius, ntracers);
     let mut tasks   = initial_tasks();
     let mut t = 0.0;
 
     while t < tf
     {
         println!("t: {:.2}", t);
-        tracers = update(&tracers, &grid, &vfields, domain_radius, dt);
+        let update_tracers  = |&t| update(&t, &grid, &vfields, domain_radius, dt);
+        let (tracers, _time) = timed(&tracers, update_tracers);
+
+        // tracers = update(&tracers, &grid, &vfields, domain_radius, dt);
         tasks.write_tracers(&tracers, &t)?;
         t += dt;
     }
@@ -224,8 +237,10 @@ fn main()
     println!("Tracers Toy Model!");
 
     let domain_radius      = TAU;
-    let block_size: usize  = 64;
+    let block_size: usize  = 1024;
     let num_tracers: usize = 100;
 
     run(domain_radius, block_size, num_tracers).unwrap_or_else(|e| println!("{}", e));
+
+    println!("block_size : {}", block_size);
 }
